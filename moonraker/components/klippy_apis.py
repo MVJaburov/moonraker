@@ -75,12 +75,21 @@ class KlippyAPI(APITransport):
             "server:klippy_disconnect", self._on_klippy_disconnect
         )
 
+        self.server.register_endpoint(
+            "/printer/change_param", RequestType.POST, self._change_param
+        )
+
     def _on_klippy_disconnect(self) -> None:
         self.host_subscription.clear()
         self.subscription_callbacks.clear()
 
     async def _gcode_pause(self, web_request: WebRequest) -> str:
         return await self.pause_print()
+    
+    async def _change_param(self, web_request: WebRequest) -> str:
+        name: str = web_request.get_str('name')
+        value: str = web_request.get_str('value')
+        return await self.change_param(name, value)
 
     async def _gcode_resume(self, web_request: WebRequest) -> str:
         return await self.resume_print()
@@ -155,6 +164,17 @@ class KlippyAPI(APITransport):
         logging.info("Requesting job pause...")
         return await self._send_klippy_request(
             "pause_resume/pause", {}, default)
+
+    async def change_param(
+        self, name: str, value: str ,default: Union[Sentinel, _T] = Sentinel.MISSING
+    ) -> Union[_T, str]:
+        self.server.send_event("klippy_apis:change_requested")
+        params = {'name': name,
+                  'value': value
+                  }
+        return await self._send_klippy_request(
+            "knob/change_param", params, default)
+
 
     async def resume_print(
         self, default: Union[Sentinel, _T] = Sentinel.MISSING
